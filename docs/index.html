@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acqua / Water — bottle weight tracker</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --ink: #1c1f23;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #3a86ff;
+    --accent-soft: rgba(58, 134, 255, 0.12);
+    --ok: #16a34a;
+    --radius: 14px;
+    --maxw: 720px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card: #171a20;
+      --ink: #e8eaed;
+      --muted: #9aa1ac;
+      --line: #262b34;
+      --accent: #5b9bff;
+      --accent-soft: rgba(91, 155, 255, 0.16);
+      --ok: #4ade80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 28px 18px 60px; }
+  header h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { color: var(--muted); margin: 0 0 8px; }
+  a { color: var(--accent); }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin: 18px 0;
+  }
+  h2 { font-size: 1.15rem; margin: 4px 0 12px; }
+  h3 { font-size: 0.95rem; margin: 18px 0 6px; color: var(--muted); font-weight: 600; }
+  ol { padding-left: 20px; margin: 8px 0; }
+  ol li { margin: 6px 0; }
+  code, kbd {
+    background: var(--accent-soft);
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #fff; border: 0;
+    padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; text-decoration: none;
+  }
+  .btn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+  }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+  input {
+    width: 100%; padding: 9px 10px; font-size: 1rem;
+    background: var(--bg); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 9px;
+  }
+
+  .now {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    margin: 4px 0 2px;
+  }
+  .now .big { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; }
+  .now .unit { font-size: 1.1rem; color: var(--muted); font-weight: 600; }
+  .sub { color: var(--muted); font-size: 0.92rem; }
+  .bar { height: 8px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; margin: 14px 0 4px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; width: 0; transition: width .4s ease; }
+
+  .tablewrap { overflow-x: auto; margin-top: 8px; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 7px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 600; font-size: 0.8rem; position: sticky; top: 0; background: var(--card); }
+  tr.current td { background: var(--accent-soft); font-weight: 700; }
+  tr.past td { color: var(--muted); }
+
+  footer { color: var(--muted); font-size: 0.85rem; margin-top: 28px; text-align: center; }
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px;
+    font-size: 0.9rem; opacity: 0; transition: all .25s ease; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>💧 Acqua / Water</h1>
+    <p>How much your water bottle should weigh at every moment, so you finish your
+       daily target by a set time. Built as a <a href="https://scriptable.app/">Scriptable</a>
+       widget for iPhone — this page is the installer and a browser version of the same table.</p>
+    <p><a href="https://github.com/smorstabilini/water-bottle-widget">Source on GitHub →</a></p>
+  </header>
+
+  <section class="card">
+    <h2>Put it on your iPhone</h2>
+    <ol>
+      <li>Install <strong>Scriptable</strong> from the App Store (free).</li>
+      <li>Copy the script with the button below (or open the raw file and share it to Scriptable).</li>
+      <li>In Scriptable tap <kbd>+</kbd>, paste, then rename the script to <code>Acqua</code>.</li>
+      <li>Long-press the home screen → <kbd>+</kbd> → <strong>Scriptable</strong> → add a Small or Medium
+          widget → <em>Edit Widget</em> → set <strong>Script</strong> to <code>Acqua</code>.</li>
+    </ol>
+    <div class="btnrow">
+      <button class="btn" id="copyBtn">Copy script</button>
+      <a class="btn secondary" id="rawLink"
+         href="https://raw.githubusercontent.com/smorstabilini/water-bottle-widget/main/acqua.js">Open raw file</a>
+    </div>
+    <h3>Auto-update</h3>
+    <p class="sub">Once installed, the script checks this repository once a day and updates
+       itself from <code>main</code>. Network is only used for that check — offline, it keeps
+       working with the version already on the phone. Turn it off by setting
+       <code>autoUpdate</code> to <code>false</code> in the settings file.</p>
+  </section>
+
+  <section class="card">
+    <h2>Calculator</h2>
+    <div class="grid">
+      <div><label for="inizio">Start (full)</label><input id="inizio" type="time" value="08:45"></div>
+      <div><label for="fine">End (empty)</label><input id="fine" type="time" value="22:00"></div>
+      <div><label for="acqua">Water (ml)</label><input id="acqua" type="number" inputmode="numeric" value="2000" min="1"></div>
+      <div><label for="tara">Empty bottle (g)</label><input id="tara" type="number" inputmode="numeric" value="29" min="0"></div>
+      <div><label for="passo">Interval (min)</label><input id="passo" type="number" inputmode="numeric" value="15" min="1"></div>
+    </div>
+
+    <div id="nowBox" style="margin-top:16px">
+      <div class="now"><span class="big" id="nowG">—</span><span class="unit">g</span></div>
+      <div class="sub" id="nowSub">—</div>
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="sub" id="nextLine"></div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Time</th><th>Bottle (g)</th><th>Water left (ml)</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Weights assume 1&nbsp;ml ≈ 1&nbsp;g. Displayed values are rounded.
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  var RAW = "https://raw.githubusercontent.com/smorstabilini/water-bottle-widget/main/acqua.js";
+  var $ = function (id) { return document.getElementById(id); };
+  var LS = "acqua-web-cfg";
+
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove("show"); }, 1800);
+  }
+
+  // ---- install helpers ----
+  $("copyBtn").addEventListener("click", function () {
+    fetch(RAW).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).then(function (txt) {
+      return navigator.clipboard.writeText(txt);
+    }).then(function () {
+      toast("Script copied — paste it in Scriptable");
+    }).catch(function () {
+      toast("Copy failed — use “Open raw file”");
+    });
+  });
+
+  // ---- calculator ----
+  var ids = ["inizio", "fine", "acqua", "tara", "passo"];
+
+  function parseHM(s) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec((s || "").trim());
+    if (!m) return null;
+    var h = +m[1], mm = +m[2];
+    if (h > 23 || mm > 59) return null;
+    return h * 60 + mm;
+  }
+  function fmtHM(mins) {
+    mins = ((Math.round(mins) % 1440) + 1440) % 1440;
+    var h = Math.floor(mins / 60), m = mins % 60;
+    return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+  }
+  function readCfg() {
+    return {
+      inizio: $("inizio").value,
+      fine: $("fine").value,
+      acquaML: +$("acqua").value,
+      bottigliaVuotaG: +$("tara").value || 0,
+      intervalloMin: Math.max(1, Math.round(+$("passo").value || 15))
+    };
+  }
+  function saveCfg(c) { try { localStorage.setItem(LS, JSON.stringify(c)); } catch (e) {} }
+  function loadCfg() {
+    try {
+      var c = JSON.parse(localStorage.getItem(LS) || "null");
+      if (!c) return;
+      if (c.inizio) $("inizio").value = c.inizio;
+      if (c.fine) $("fine").value = c.fine;
+      if (c.acquaML) $("acqua").value = c.acquaML;
+      if (c.bottigliaVuotaG != null) $("tara").value = c.bottigliaVuotaG;
+      if (c.intervalloMin) $("passo").value = c.intervalloMin;
+    } catch (e) {}
+  }
+
+  function render() {
+    var c = readCfg();
+    saveCfg(c);
+
+    var start = parseHM(c.inizio), end = parseHM(c.fine);
+    var nowBox = $("nowBox"), rows = $("rows");
+
+    if (start == null || end == null || end <= start || !(c.acquaML > 0)) {
+      $("nowG").textContent = "—";
+      $("nowSub").textContent = "Check the times and water amount.";
+      $("barFill").style.width = "0";
+      $("nextLine").textContent = "";
+      rows.innerHTML = "";
+      return;
+    }
+
+    var step = c.intervalloMin;
+    var n = Math.floor((end - start) / step);
+    if (n < 1) {
+      $("nowSub").textContent = "Interval too large for the window.";
+      rows.innerHTML = "";
+      return;
+    }
+    var full = c.acquaML + c.bottigliaVuotaG;
+    var perStep = c.acquaML / n;
+
+    var d = new Date();
+    var nowMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    var k = nowMin <= start ? 0 : (nowMin >= end ? n : Math.floor((nowMin - start) / step));
+
+    var targetNow = full - perStep * k;
+    var leftNow = c.acquaML - perStep * k;
+
+    $("nowG").textContent = Math.round(targetNow);
+    if (nowMin < start) {
+      $("nowSub").textContent = "Full bottle · starts at " + c.inizio;
+    } else if (nowMin >= end) {
+      $("nowSub").textContent = "Done — bottle empty (" + Math.round(c.bottigliaVuotaG) + " g)";
+    } else {
+      $("nowSub").textContent = Math.round(leftNow) + " ml left · " +
+        Math.round((k / n) * 100) + "% of the day";
+    }
+    $("barFill").style.width = Math.max(0, Math.min(1, k / n)) * 100 + "%";
+
+    if (nowMin < end) {
+      var nk = Math.min(k + 1, n);
+      $("nextLine").textContent = "next: " + Math.round(full - perStep * nk) +
+        " g at " + fmtHM(start + nk * step);
+    } else {
+      $("nextLine").textContent = "";
+    }
+
+    var html = "";
+    for (var i = 0; i <= n; i++) {
+      var cls = i === k ? "current" : (i < k ? "past" : "");
+      html += "<tr class='" + cls + "'><td>" + fmtHM(start + i * step) +
+        "</td><td>" + Math.round(full - perStep * i) +
+        "</td><td>" + Math.round(c.acquaML - perStep * i) + "</td></tr>";
+    }
+    rows.innerHTML = html;
+  }
+
+  loadCfg();
+  ids.forEach(function (id) { $(id).addEventListener("input", render); });
+  render();
+  setInterval(render, 30000);
+})();
+</script>
+</body>
+</html>

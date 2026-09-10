@@ -24,10 +24,16 @@ const DEFAULT_CONFIG = {
   bottigliaVuotaG: 29,   // empty bottle tare
   intervalloMin: 15,     // minutes between checkpoints
   notificaMin: 0,        // reminder cadence: 0 (off) | 15 | 30 | 60
+  autoUpdate: true,      // check GitHub once a day and self-update
   lingua: "auto",        // "auto" | "it" | "en"
 };
 
 const NOTIF_PREFIX = "acqua-";   // identifica le notifiche di questo script
+
+// sorgente per l'auto-aggiornamento / self-update source
+const UPDATE_URL = "https://raw.githubusercontent.com/smorstabilini/water-bottle-widget/main/acqua.js";
+const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
+const UPDATE_SENTINEL = "ACQUA / WATER";
 
 
 // ---------- traduzioni / translations ----------
@@ -94,6 +100,9 @@ const STR = {
     lang_title: "Lingua / Language",
     lang_auto: "Automatico (come il telefono)",
     lang_updated: "Lingua aggiornata.",
+
+    upd_title: "Aggiornato",
+    upd_msg: "Script aggiornato all'ultima versione da GitHub. Riaprilo per usarla.",
 
     btn_save: "Salva",
     btn_cancel: "Annulla",
@@ -162,6 +171,9 @@ const STR = {
     lang_auto: "Automatic (match phone)",
     lang_updated: "Language updated.",
 
+    upd_title: "Updated",
+    upd_msg: "Script updated to the latest version from GitHub. Reopen it to use it.",
+
     btn_save: "Save",
     btn_cancel: "Cancel",
     btn_ok: "OK",
@@ -201,6 +213,61 @@ function loadConfig() {
 
 function saveConfig(cfg) {
   fm.writeString(CONFIG_PATH, JSON.stringify(cfg, null, 2));
+}
+
+
+// ---------- auto-aggiornamento / self-update ----------
+const UPDATE_STAMP = fm.joinPath(fm.documentsDirectory(), "acqua-update.json");
+
+function lastUpdateCheck() {
+  try {
+    if (fm.fileExists(UPDATE_STAMP)) return JSON.parse(fm.readString(UPDATE_STAMP)).t || 0;
+  } catch (e) {}
+  return 0;
+}
+
+// Scarica l'ultima versione da GitHub e riscrive questo file.
+// silent=true (widget): niente alert, solo notifica se cambia qualcosa.
+// La rete serve SOLO per il check: se fallisce, lo script continua com'e'.
+async function checkForUpdate(silent) {
+  if (Date.now() - lastUpdateCheck() < UPDATE_EVERY_MS) return false;
+  try {
+    const req = new Request(UPDATE_URL);
+    req.timeoutInterval = 12;
+    const remote = await req.loadString();
+
+    // segna il tentativo comunque, per non ritentare a ogni avvio
+    try { fm.writeString(UPDATE_STAMP, JSON.stringify({ t: Date.now() })); } catch (e) {}
+
+    if (!remote || remote.length < 2000 || remote.indexOf(UPDATE_SENTINEL) === -1) return false;
+
+    const path = module.filename;
+    let local = "";
+    try { local = fm.readString(path); } catch (e) {}
+    if (remote === local) return false;
+
+    fm.writeString(path, remote);
+
+    if (silent) {
+      try {
+        const n = new Notification();
+        n.identifier = "acqua-updated-" + Date.now();
+        n.title = T("n_title");
+        n.body = T("upd_msg");
+        n.threadIdentifier = "acqua";
+        await n.schedule();
+      } catch (e) {}
+    } else {
+      const a = new Alert();
+      a.title = T("upd_title");
+      a.message = T("upd_msg");
+      a.addAction(T("btn_ok"));
+      await a.presentAlert();
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 
@@ -612,11 +679,13 @@ async function main() {
   if (config.runsInWidget) {
     await ensureNotifications(settings, false);
     Script.setWidget(model.errors ? errorWidget(model) : buildWidget(model));
+    if (settings.autoUpdate !== false) await checkForUpdate(true);
     Script.complete();
     return;
   }
 
   // --- dentro l'app / inside the app ---
+  if (settings.autoUpdate !== false) await checkForUpdate(false);
   await ensureNotifications(settings, false);
 
   if (model.errors) {

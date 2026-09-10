@@ -11,7 +11,11 @@ and drink until it matches.
   with the full schedule.
 - Optional **reminder notifications** every 15 / 30 / 60 minutes (or off).
 - **Bilingual**: Italian / English, with an in‑app language switch.
-- **100 % offline.** No server, no account, no network.
+- **Self‑updating** from this repo once a day (can be turned off).
+- **Works offline.** No server, no account. Network is used only for the daily
+  update check, and only if `autoUpdate` is on.
+
+**Install page + browser version:** <https://smorstabilini.github.io/water-bottle-widget/>
 
 ---
 
@@ -106,6 +110,7 @@ Open the script in Scriptable → **Edit settings**:
 | Empty bottle, in g | tare on the scale | `29` |
 | Interval in minutes | minutes between checkpoints | `15` |
 | `notificaMin` | reminder cadence in minutes: `0`, `15`, `30`, `60` | `0` |
+| `autoUpdate` | check GitHub once a day and self-update | `true` |
 
 Settings are stored in `acqua-config.json` in Scriptable's local documents
 folder. The code itself is never edited.
@@ -123,8 +128,27 @@ snippet, e.g. a weekend widget:
 ```
 
 Recognised keys: `inizio`, `fine`, `acquaML`, `bottigliaVuotaG`,
-`intervalloMin`, `notificaMin`, `lingua`. Anything you set here overrides the
-saved settings for that widget only.
+`intervalloMin`, `notificaMin`, `autoUpdate`, `lingua`. Anything you set here
+overrides the saved settings for that widget only.
+
+---
+
+## Auto-update
+
+When `autoUpdate` is `true` (default), the script fetches
+`acqua.js` from the `main` branch of this repo at most once every 24 hours and
+overwrites its own file. The new version is picked up the next time the script
+runs. You get a short notice ("Reopen it to use it").
+
+- The check is wrapped in `try/catch` with a 12‑second timeout: **if there is no
+  network or GitHub is unreachable, nothing happens and the script keeps running
+  the version already installed.**
+- The last-check timestamp lives in `acqua-update.json`.
+- Because it follows `main`, a bad commit reaches the phone on the next check.
+  Set `autoUpdate` to `false` in `acqua-config.json` (or via the widget
+  Parameter) if you'd rather update by hand.
+- To update immediately, delete `acqua-update.json` in Scriptable's Files and
+  reopen the script.
 
 ---
 
@@ -186,4 +210,6 @@ pending ones) and delete the automation if you made one.
 ## Files
 
 - `acqua.js` — the Scriptable script (script + widget in one file).
+- `docs/index.html` — the GitHub Pages install page + browser calculator.
 - `acqua-config.json` — created on the phone by Scriptable when you save settings.
+- `acqua-update.json` — created on the phone; holds the last update-check time.
