@@ -145,7 +145,8 @@ Menu → **Controlla aggiornamenti / Check for updates** compares it with the
 `VERSION` in `acqua.js` on `main` and tells you *"you're on the latest version"*,
 *"updated — reopen it"*, or *"can't check right now"*.
 
-**When publishing a change:** bump `VERSION`, then optionally tag the commit:
+**When publishing a change:** add an entry to [CHANGELOG.md](CHANGELOG.md), bump
+`VERSION`, then optionally tag the commit:
 
 ```sh
 git tag v1.0.1 && git push --tags
@@ -235,6 +236,10 @@ pending ones) and delete the automation if you made one.
 - `docs/index.html` — the GitHub Pages install page + browser calculator.
 - `acqua-config.json` — created on the phone by Scriptable when you save settings.
 - `acqua-update.json` — created on the phone; holds the last update-check time.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
