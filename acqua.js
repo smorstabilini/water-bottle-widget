@@ -15,6 +15,10 @@
 //  100% offline. Nessun server. / No server.
 // ============================================================
 
+// Versione dello script / script version (semver: major.minor.patch).
+// Va incrementata a ogni modifica pubblicata su main.
+const VERSION = "1.0.0";
+
 
 // ---------- CONFIG DI DEFAULT / DEFAULT CONFIG ----------
 const DEFAULT_CONFIG = {
@@ -47,7 +51,7 @@ const STR = {
     w_left: (x) => `restano ${x} ml`,
     w_next: (x, time) => `prossimo: ${x} g · ${time}`,
 
-    t_header: (a, b, ml) => `💧 ${a}–${b}  ·  ${ml} ml`,
+    t_header: (a, b, ml, v) => `💧 ${a}–${b}  ·  ${ml} ml  ·  v${v}`,
     t_empty: "Bottiglia vuota",
     t_now: (x) => `Adesso ≈ ${x} g`,
     t_left: (x) => `restano ${x} ml`,
@@ -62,6 +66,7 @@ const STR = {
     a_settings: "Modifica impostazioni",
     a_notify: "Notifiche / Notifications",
     a_language: "Lingua / Language",
+    a_update: "Controlla aggiornamenti",
     a_reset: "Ripristina valori di default",
     a_close: "Chiudi",
 
@@ -101,8 +106,10 @@ const STR = {
     lang_auto: "Automatico (come il telefono)",
     lang_updated: "Lingua aggiornata.",
 
-    upd_title: "Aggiornato",
+    upd_title: "Aggiornamenti",
     upd_msg: "Script aggiornato all'ultima versione da GitHub. Riaprilo per usarla.",
+    upd_latest: (v) => `Sei già alla versione più recente (v${v}).`,
+    upd_error: "Impossibile controllare ora. Riprova quando sei online.",
 
     btn_save: "Salva",
     btn_cancel: "Annulla",
@@ -117,7 +124,7 @@ const STR = {
     w_left: (x) => `${x} ml left`,
     w_next: (x, time) => `next: ${x} g · ${time}`,
 
-    t_header: (a, b, ml) => `💧 ${a}–${b}  ·  ${ml} ml`,
+    t_header: (a, b, ml, v) => `💧 ${a}–${b}  ·  ${ml} ml  ·  v${v}`,
     t_empty: "Empty bottle",
     t_now: (x) => `Now ≈ ${x} g`,
     t_left: (x) => `${x} ml left`,
@@ -132,6 +139,7 @@ const STR = {
     a_settings: "Edit settings",
     a_notify: "Notifiche / Notifications",
     a_language: "Lingua / Language",
+    a_update: "Check for updates",
     a_reset: "Reset to defaults",
     a_close: "Close",
 
@@ -171,8 +179,10 @@ const STR = {
     lang_auto: "Automatic (match phone)",
     lang_updated: "Language updated.",
 
-    upd_title: "Updated",
+    upd_title: "Updates",
     upd_msg: "Script updated to the latest version from GitHub. Reopen it to use it.",
+    upd_latest: (v) => `You're on the latest version (v${v}).`,
+    upd_error: "Can't check right now. Try again when online.",
 
     btn_save: "Save",
     btn_cancel: "Cancel",
@@ -226,48 +236,73 @@ function lastUpdateCheck() {
   return 0;
 }
 
-// Scarica l'ultima versione da GitHub e riscrive questo file.
-// silent=true (widget): niente alert, solo notifica se cambia qualcosa.
+function parseVer(s) {
+  return String(s || "").trim().split(".").map((x) => parseInt(x, 10) || 0);
+}
+// -1 se a<b, 0 se uguali, 1 se a>b
+function cmpVer(a, b) {
+  const A = parseVer(a), B = parseVer(b);
+  const len = Math.max(A.length, B.length);
+  for (let i = 0; i < len; i++) {
+    const d = (A[i] || 0) - (B[i] || 0);
+    if (d !== 0) return d < 0 ? -1 : 1;
+  }
+  return 0;
+}
+function extractVersion(src) {
+  const m = /VERSION\s*=\s*["']([\d.]+)["']/.exec(String(src || ""));
+  return m ? m[1] : null;
+}
+
+// Confronta la versione locale con quella su GitHub e, se piu' recente,
+// riscrive questo file. Ritorna: "updated" | "latest" | "error" | "throttled".
+// silent=true (widget): nessun alert, solo notifica se aggiorna.
+// force=true: ignora il limite giornaliero.
 // La rete serve SOLO per il check: se fallisce, lo script continua com'e'.
-async function checkForUpdate(silent) {
-  if (Date.now() - lastUpdateCheck() < UPDATE_EVERY_MS) return false;
+async function checkForUpdate(silent, force) {
+  if (!force && Date.now() - lastUpdateCheck() < UPDATE_EVERY_MS) return "throttled";
+
+  let remote;
   try {
     const req = new Request(UPDATE_URL);
     req.timeoutInterval = 12;
-    const remote = await req.loadString();
-
-    // segna il tentativo comunque, per non ritentare a ogni avvio
-    try { fm.writeString(UPDATE_STAMP, JSON.stringify({ t: Date.now() })); } catch (e) {}
-
-    if (!remote || remote.length < 2000 || remote.indexOf(UPDATE_SENTINEL) === -1) return false;
-
-    const path = module.filename;
-    let local = "";
-    try { local = fm.readString(path); } catch (e) {}
-    if (remote === local) return false;
-
-    fm.writeString(path, remote);
-
-    if (silent) {
-      try {
-        const n = new Notification();
-        n.identifier = "acqua-updated-" + Date.now();
-        n.title = T("n_title");
-        n.body = T("upd_msg");
-        n.threadIdentifier = "acqua";
-        await n.schedule();
-      } catch (e) {}
-    } else {
-      const a = new Alert();
-      a.title = T("upd_title");
-      a.message = T("upd_msg");
-      a.addAction(T("btn_ok"));
-      await a.presentAlert();
-    }
-    return true;
+    remote = await req.loadString();
   } catch (e) {
-    return false;
+    return "error";
   }
+
+  // segna il tentativo comunque, per non ritentare a ogni avvio
+  try { fm.writeString(UPDATE_STAMP, JSON.stringify({ t: Date.now(), v: VERSION })); } catch (e) {}
+
+  if (!remote || remote.length < 2000 || remote.indexOf(UPDATE_SENTINEL) === -1) return "error";
+
+  const remoteVer = extractVersion(remote);
+  const path = module.filename;
+  let local = "";
+  try { local = fm.readString(path); } catch (e) {}
+
+  const newer = remoteVer ? cmpVer(remoteVer, VERSION) > 0 : (remote !== local);
+  if (!newer) return "latest";
+
+  fm.writeString(path, remote);
+
+  if (silent) {
+    try {
+      const n = new Notification();
+      n.identifier = "acqua-updated-" + Date.now();
+      n.title = T("n_title");
+      n.body = T("upd_msg");
+      n.threadIdentifier = "acqua";
+      await n.schedule();
+    } catch (e) {}
+  } else {
+    const a = new Alert();
+    a.title = T("upd_title");
+    a.message = T("upd_msg") + (remoteVer ? `\n\nv${VERSION} → v${remoteVer}` : "");
+    a.addAction(T("btn_ok"));
+    await a.presentAlert();
+  }
+  return "updated";
 }
 
 
@@ -545,7 +580,7 @@ function presentTable(model) {
 
   const header = new UITableRow();
   header.isHeader = true;
-  header.addText(T("t_header")(model.cfg.inizio, model.cfg.fine, model.water));
+  header.addText(T("t_header")(model.cfg.inizio, model.cfg.fine, model.water, VERSION));
   table.addRow(header);
 
   const summary = new UITableRow();
@@ -679,13 +714,13 @@ async function main() {
   if (config.runsInWidget) {
     await ensureNotifications(settings, false);
     Script.setWidget(model.errors ? errorWidget(model) : buildWidget(model));
-    if (settings.autoUpdate !== false) await checkForUpdate(true);
+    if (settings.autoUpdate !== false) await checkForUpdate(true, false);
     Script.complete();
     return;
   }
 
   // --- dentro l'app / inside the app ---
-  if (settings.autoUpdate !== false) await checkForUpdate(false);
+  if (settings.autoUpdate !== false) await checkForUpdate(false, false);
   await ensureNotifications(settings, false);
 
   if (model.errors) {
@@ -706,7 +741,7 @@ async function main() {
   }
 
   const menu = new Alert();
-  menu.title = T("m_title");
+  menu.title = `${T("m_title")}  ·  v${VERSION}`;
   menu.message = model.finished
     ? T("m_finished")(g(model.full - model.water))
     : (model.started
@@ -716,7 +751,8 @@ async function main() {
   menu.addAction(T("a_settings"));   // 1
   menu.addAction(T("a_notify"));     // 2
   menu.addAction(T("a_language"));   // 3
-  menu.addAction(T("a_reset"));      // 4
+  menu.addAction(T("a_update"));     // 4
+  menu.addAction(T("a_reset"));      // 5
   menu.addCancelAction(T("a_close"));
   const choice = await menu.presentSheet();
 
@@ -747,6 +783,16 @@ async function main() {
     await chooseLanguage(settings);
 
   } else if (choice === 4) {
+    const st = await checkForUpdate(false, true); // "updated" mostra gia' il suo alert
+    if (st === "latest" || st === "error") {
+      const e = new Alert();
+      e.title = T("upd_title");
+      e.message = st === "latest" ? T("upd_latest")(VERSION) : T("upd_error");
+      e.addAction(T("btn_ok"));
+      await e.presentAlert();
+    }
+
+  } else if (choice === 5) {
     const nc = { ...DEFAULT_CONFIG, lingua: settings.lingua };
     saveConfig(nc);
     await ensureNotifications(nc, true); // notificaMin = 0 → pulisce le notifiche

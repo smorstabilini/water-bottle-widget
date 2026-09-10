@@ -93,6 +93,8 @@ Tap the script (or the widget) to get:
 - **Notifiche / Notifications** — reminder cadence: *off*, *every 15 min*,
   *every 30 min*, *every hour*.
 - **Lingua / Language** — *Automatic* (follow the phone), *Italiano*, *English*.
+- **Controlla aggiornamenti / Check for updates** — compare the installed
+  `VERSION` with `main` on GitHub.
 - **Reset to defaults** — restores everything except the chosen language, and
   clears any scheduled reminders.
 
@@ -133,18 +135,38 @@ overrides the saved settings for that widget only.
 
 ---
 
+## Version
+
+The script carries a `VERSION` constant (semver `major.minor.patch`) near the
+top of `acqua.js`. It is shown in the **menu title** and the **table header**
+(`… · v1.0.0`), so you can read off the installed version at a glance.
+
+Menu → **Controlla aggiornamenti / Check for updates** compares it with the
+`VERSION` in `acqua.js` on `main` and tells you *"you're on the latest version"*,
+*"updated — reopen it"*, or *"can't check right now"*.
+
+**When publishing a change:** bump `VERSION`, then optionally tag the commit:
+
+```sh
+git tag v1.0.1 && git push --tags
+```
+
+The auto-updater triggers on the `VERSION` number being higher, so a change with
+the same version is not pushed to phones even if the file differs.
+
 ## Auto-update
 
-When `autoUpdate` is `true` (default), the script fetches
-`acqua.js` from the `main` branch of this repo at most once every 24 hours and
+When `autoUpdate` is `true` (default), the script checks `acqua.js` on the
+`main` branch at most once every 24 hours and, **if its `VERSION` is higher**,
 overwrites its own file. The new version is picked up the next time the script
 runs. You get a short notice ("Reopen it to use it").
 
 - The check is wrapped in `try/catch` with a 12‑second timeout: **if there is no
   network or GitHub is unreachable, nothing happens and the script keeps running
   the version already installed.**
-- The last-check timestamp lives in `acqua-update.json`.
-- Because it follows `main`, a bad commit reaches the phone on the next check.
+- The last-check timestamp and version live in `acqua-update.json`.
+- Because it follows `main`, a bad commit with a bumped version reaches the phone
+  on the next check.
   Set `autoUpdate` to `false` in `acqua-config.json` (or via the widget
   Parameter) if you'd rather update by hand.
 - To update immediately, delete `acqua-update.json` in Scriptable's Files and

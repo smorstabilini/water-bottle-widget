@@ -132,6 +132,9 @@
       <a class="btn secondary" id="rawLink"
          href="https://raw.githubusercontent.com/smorstabilini/water-bottle-widget/main/acqua.js">Open raw file</a>
     </div>
+    <p class="sub" id="verLine" style="margin-top:10px">Latest version: <span id="verNum">…</span>
+      — the script shows its own version in the menu title and the table header, so you
+      can tell if yours is current.</p>
     <h3>Auto-update</h3>
     <p class="sub">Once installed, the script checks this repository once a day and updates
        itself from <code>main</code>. Network is only used for that check — offline, it keeps
@@ -187,11 +190,25 @@
   }
 
   // ---- install helpers ----
-  $("copyBtn").addEventListener("click", function () {
-    fetch(RAW).then(function (r) {
+  var scriptCache = null;
+
+  function getScript() {
+    if (scriptCache) return Promise.resolve(scriptCache);
+    return fetch(RAW).then(function (r) {
       if (!r.ok) throw new Error(r.status);
       return r.text();
-    }).then(function (txt) {
+    }).then(function (txt) { scriptCache = txt; return txt; });
+  }
+
+  getScript().then(function (txt) {
+    var m = /VERSION\s*=\s*["']([\d.]+)["']/.exec(txt);
+    $("verNum").textContent = m ? "v" + m[1] : "(unknown)";
+  }).catch(function () {
+    $("verNum").textContent = "(offline)";
+  });
+
+  $("copyBtn").addEventListener("click", function () {
+    getScript().then(function (txt) {
       return navigator.clipboard.writeText(txt);
     }).then(function () {
       toast("Script copied — paste it in Scriptable");
