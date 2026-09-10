@@ -213,3 +213,7 @@ pending ones) and delete the automation if you made one.
 - `docs/index.html` — the GitHub Pages install page + browser calculator.
 - `acqua-config.json` — created on the phone by Scriptable when you save settings.
 - `acqua-update.json` — created on the phone; holds the last update-check time.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
